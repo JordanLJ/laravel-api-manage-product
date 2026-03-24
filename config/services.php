@@ -38,6 +38,8 @@ return [
     'identity' => [
         'issuer' => env('IDENTITY_ISSUER'),
         'audience' => env('IDENTITY_AUDIENCE'),
+        'jwks_cache_ttl' => (int) env('IDENTITY_JWKS_CACHE_TTL', 3600),
+        'http_timeout_seconds' => (int) env('IDENTITY_HTTP_TIMEOUT_SECONDS', 5),
     ],
 
 ];

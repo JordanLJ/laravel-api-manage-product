@@ -14,7 +14,7 @@ Route::middleware(['identity.auth'])->group(function () {
 
     // Routes avancées
     Route::get('products/category/{category}', [ProductController::class, 'getByCategory']); // filtrer par catégorie
-    Route::patch('products/{product}/toggle', [ProductController::class, 'toggleActive']); // activer/désactiver produit
+    Route::patch('products/{product}/toggle-active', [ProductController::class, 'toggleActive']); // activer/désactiver produit
 });
 
 Route::get('/user', function (Request $request) {
@@ -22,5 +22,3 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::get('/categories', [CategoryController::class, 'index']);
-
-Route::apiResource('products', ProductController::class);

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use RuntimeException;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        $issuer = (string) config('services.identity.issuer');
+
+        // Mandatory logical issuer for all OAuth/OIDC integrations.
+        if (trim($issuer) === '') {
+            throw new RuntimeException('IDENTITY_ISSUER is required and must be a stable logical issuer URL.');
+        }
     }
 }

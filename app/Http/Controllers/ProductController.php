@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Http\Resources\ProductResource;
+use App\Http\Requests\StoreProductRequest;
 
 class ProductController extends Controller
 {
@@ -18,20 +20,10 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreProductRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'quantity' => 'required|integer|min:0',
-            'sku' => 'required|string|unique:products',
-            'category_id' => 'required|exists:categories,id', // <-- clé étrangère
-            'is_active' => 'boolean',
-        ]);
-
-        $product = Product::create($validated);
-        return response()->json($product, 201);
+        $product = Product::create($request->validated());
+        return response()->json(new ProductResource($product->load('category')), 201);
     }
 
     public function show(Product $product)
@@ -46,14 +38,14 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'price' => 'sometimes|numeric|min:0',
             'quantity' => 'sometimes|integer|min:0',
-            'category' => 'sometimes|string|max:50',
+            'category_id' => 'sometimes|exists:categories,id',
             'sku' => 'sometimes|string|unique:products,sku,'.$product->id,
             'is_active' => 'boolean',
         ]);
 
         $product->update($validated);
 
-        return response()->json($product);
+        return response()->json(new ProductResource($product->load('category')));
     }
 
     public function destroy(Product $product)
@@ -64,10 +56,13 @@ class ProductController extends Controller
     }
 
     // Filtrer les produits par catégorie
-    public function getByCategory($category)
+    public function getByCategory(Category $category)
     {
-        return Product::where('category', $category)->get();
-        
+        $products = Product::with('category')
+            ->where('category_id', $category->id)
+            ->paginate(10);
+
+        return ProductResource::collection($products);
     }
 
     // Activer ou désactiver un produit
@@ -76,6 +71,6 @@ class ProductController extends Controller
         $product->is_active = !$product->is_active;
         $product->save();
 
-        return response()->json($product);
+        return response()->json(new ProductResource($product->load('category')));
     }
 }

@@ -12,7 +12,7 @@ class StoreProductRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -29,6 +29,7 @@ class StoreProductRequest extends FormRequest
             'description' => 'nullable|string',
             'sku' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
+            'is_active' => 'sometimes|boolean',
         ];
     }
 }

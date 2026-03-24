@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Firebase\JWT\JWT;
 use Firebase\JWT\JWK;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -22,12 +23,40 @@ class VerifyIdentityToken
         $token = str_replace('Bearer ', '', $authHeader);
 
         try {
+            $issuer = (string) config('services.identity.issuer');
+            $audience = (string) config('services.identity.audience');
+            $jwksCacheTtl = (int) config('services.identity.jwks_cache_ttl', 3600);
+            $httpTimeout = (int) config('services.identity.http_timeout_seconds', 5);
 
-            $issuer = config('services.identity.issuer');
-            $audience = config('services.identity.audience');
+            if (trim($issuer) === '') {
+                return response()->json(['error' => 'Identity issuer is not configured'], 500);
+            }
 
-            // récupérer les clés publiques JWKS
-            $jwks = Http::get($issuer . '/.well-known/jwks.json')->json();
+            if (trim($audience) === '') {
+                return response()->json(['error' => 'Identity audience is not configured'], 500);
+            }
+
+            // Local JWT validation with cached JWKS from logical issuer.
+            $jwks = Cache::remember(
+                'identity_jwks_' . md5($issuer),
+                now()->addSeconds($jwksCacheTtl),
+                function () use ($issuer, $httpTimeout) {
+                    $response = Http::timeout($httpTimeout)
+                        ->acceptJson()
+                        ->get(rtrim($issuer, '/') . '/.well-known/jwks.json');
+
+                    if (!$response->ok()) {
+                        throw new \RuntimeException('Unable to fetch JWKS from identity issuer');
+                    }
+
+                    $payload = $response->json();
+                    if (!is_array($payload) || !isset($payload['keys']) || !is_array($payload['keys'])) {
+                        throw new \RuntimeException('Invalid JWKS payload');
+                    }
+
+                    return $payload;
+                }
+            );
 
             $keys = JWK::parseKeySet($jwks);
 
@@ -41,6 +70,10 @@ class VerifyIdentityToken
             // Vérifier audience
             if (!in_array($audience, (array)$decoded->aud)) {
                 return response()->json(['error' => 'Invalid audience'], 401);
+            }
+
+            if (!isset($decoded->tenant_id)) {
+                return response()->json(['error' => 'Missing tenant_id claim'], 401);
             }
 
             // stocker l'utilisateur dans la requête
